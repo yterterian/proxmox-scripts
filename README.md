@@ -11,7 +11,7 @@ A curated collection of optimised Proxmox LXC installation scripts for self-host
 #### Quick Install
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/Actual_Budget/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/master/Actual_Budget/install.sh)
 ```
 
 #### Alternative Installation Methods
@@ -28,7 +28,7 @@ chmod +x install.sh
 ##### Download and Review
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/Actual_Budget/install.sh
+curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/master/Actual_Budget/install.sh
 cat install.sh  # Review the script
 chmod +x install.sh
 ./install.sh
@@ -93,7 +93,7 @@ Application_Name/
 Create your LXC container manually in Proxmox, then run inside the container:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/[APP_FOLDER]/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/master/[APP_FOLDER]/install.sh)
 ```
 
 ### Pattern 2: Download and Inspect
@@ -101,7 +101,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/m
 If you prefer to review scripts before execution:
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/[APP_FOLDER]/install.sh
+curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/master/[APP_FOLDER]/install.sh
 cat install.sh  # Review the script
 chmod +x install.sh
 ./install.sh
@@ -112,7 +112,7 @@ chmod +x install.sh
 Run from Proxmox host to auto-create container:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/[APP_FOLDER]/[app].sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/master/[APP_FOLDER]/[app].sh)"
 ```
 
 ## Features
