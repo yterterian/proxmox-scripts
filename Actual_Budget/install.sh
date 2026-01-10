@@ -14,6 +14,6 @@ GITHUB_USER="yterterian"
 GITHUB_REPO="proxmox-scripts"
 GITHUB_BRANCH="main"
 
-SCRIPT_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/actualbudget/standalone/actualbudget-standalone.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/Actual_Budget/actualbudget-standalone.sh"
 
 exec bash <(curl -fsSL "${SCRIPT_URL}")

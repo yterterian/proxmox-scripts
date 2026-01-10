@@ -8,27 +8,42 @@ A curated collection of optimised Proxmox LXC installation scripts for self-host
 
 [Actual Budget](https://actualbudget.org/) is a local-first personal finance tool with bank sync capabilities.
 
-**Quick Install (Standalone):**
+#### Quick Install
+
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/Actual_Budget/install.sh)
 ```
 
-**Manual Install:**
+#### Alternative Installation Methods
+
+##### Clone Repository First
+
 ```bash
-# Download and review the script
-curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/Actual_Budget/install.sh
+git clone https://github.com/yterterian/proxmox-scripts.git
+cd proxmox-scripts/Actual_Budget
 chmod +x install.sh
 ./install.sh
 ```
 
-**What You Get:**
+##### Download and Review
+
+```bash
+curl -fsSL -o install.sh https://raw.githubusercontent.com/yterterian/proxmox-scripts/main/Actual_Budget/install.sh
+cat install.sh  # Review the script
+chmod +x install.sh
+./install.sh
+```
+
+#### What You Get
+
 - Actual Budget running on port 5006
 - Systemd service for automatic startup
 - Custom MOTD banner showing IP address and port
 - `update` command for easy version updates
 - Debian 12/13 based LXC container
 
-**Post-Installation:**
+#### Post-Installation Commands
+
 | Command | Description |
 |---------|-------------|
 | `update` | Check for and apply Actual Budget updates |
