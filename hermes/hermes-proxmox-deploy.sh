@@ -58,8 +58,8 @@ read -rp "${INFO} Telegram bot token              : " BOT_TOKEN
 read -rp "${INFO} Owner Telegram chat id          : " HOME_CHAT_ID
 read -rp "${INFO} Ollama base URL                 [http://10.1.1.194:11434/v1]: " OLLAMA_BASE_URL
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://10.1.1.194:11434/v1}"
-read -rp "${INFO} Ollama model name               [hermes-gptoss:latest]: " OLLAMA_MODEL
-OLLAMA_MODEL="${OLLAMA_MODEL:-hermes-gptoss:latest}"
+read -rp "${INFO} Ollama model name               [gemma4:12b]: " OLLAMA_MODEL
+OLLAMA_MODEL="${OLLAMA_MODEL:-gemma4:12b}"
 read -rp "${INFO} Tavily API key (tvly-..., optional): " TAVILY_API_KEY
 [ -n "$BOT_TOKEN" ] || { msg_error "Bot token is required."; exit 1; }
 
