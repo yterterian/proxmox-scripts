@@ -182,7 +182,7 @@ terminal["container_persistent"] = True
 terminal["persistent_shell"] = True
 cfg.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 PY
-pct push "$HERMES_CTID" "$CONFIG_TMP" /root/configure-hermes-docker.py --perms 700
+pct push "$HERMES_CTID" "$CONFIG_TMP" /tmp/configure-hermes-docker.py --perms 755
 rm -f "$CONFIG_TMP"
 
 pct exec "$HERMES_CTID" -- bash -lc "
@@ -191,16 +191,16 @@ pct exec "$HERMES_CTID" -- bash -lc "
     grep -q 'DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' ~/.bashrc 2>/dev/null \
       || echo 'export DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' >> ~/.bashrc
     SANDBOX_IMAGE='$SANDBOX_IMAGE' OUTPUT_MOUNT='$OUTPUT_MOUNT' \
-      \\\$HOME/.hermes/hermes-agent/venv/bin/python /root/configure-hermes-docker.py
+      \\\$HOME/.hermes/hermes-agent/venv/bin/python /tmp/configure-hermes-docker.py
   \"
-  rm -f /root/configure-hermes-docker.py
+  rm -f /tmp/configure-hermes-docker.py
 "
 ok "DOCKER_HOST set; Hermes Docker backend configured with $OUTPUT_MOUNT"
 
 # ---- 8. end-to-end verify ----------------------------------------------------
 info "End-to-end test: hermes -> ssh -> docker on the sandbox"
 if pct exec "$HERMES_CTID" -- su - "$HERMES_USER" -c \
-   "DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR docker run --rm hello-world >/dev/null 2>&1"; then
+   "DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR docker run --rm hello-world"; then
   ok "VERIFIED — hermes can run containers on the sandbox over SSH"
 else
   die "End-to-end test failed. Debug from CT $HERMES_CTID as hermes:
