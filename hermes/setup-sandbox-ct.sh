@@ -162,6 +162,18 @@ info "Pre-pulling $SANDBOX_IMAGE on the sandbox (first-run speed)"
 pct exec "$SANDBOX_CTID" -- docker pull "$SANDBOX_IMAGE" >/dev/null 2>&1 \
   && ok "Image cached" || info "Image pull failed (will pull on first use)"
 
+# ---- 6b. install Docker CLI on Hermes CT -------------------------------------
+info "Installing Docker CLI on CT $HERMES_CTID (client only; local daemon disabled)"
+pct exec "$HERMES_CTID" -- bash -lc '
+  export DEBIAN_FRONTEND=noninteractive
+  if ! command -v docker >/dev/null 2>&1; then
+    apt-get update -qq
+    apt-get install -y -qq docker.io >/dev/null
+  fi
+  systemctl disable --now docker docker.socket containerd >/dev/null 2>&1 || true
+'
+ok "Docker CLI ready on CT $HERMES_CTID"
+
 # ---- 7. point Hermes at the remote docker ------------------------------------
 info "Configuring Hermes to use the remote Docker sandbox"
 CONFIG_TMP="$(mktemp)"
