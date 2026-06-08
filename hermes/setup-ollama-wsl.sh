@@ -116,9 +116,10 @@ ${YW}=== WINDOWS-SIDE STEPS (cannot be scripted from inside WSL) ===${CL}
        powercfg /change standby-timeout-ac 0
        powercfg /change hibernate-timeout-ac 0
 
-5. Point Hermes at this box. In install-hermes-ct.sh choose 'ollama' and set:
-       Base URL : http://<this-PC-LAN-IP>:11434/v1
-       Model    : gemma4:12b
+5. Point Hermes at this box. In hermes-proxmox-deploy.sh set:
+       Ollama base URL : http://<this-PC-LAN-IP>:11434/v1
+       Ollama model    : gemma4:12b
+   (If you intentionally use the legacy installer, choose the 'ollama' option.)
    Find the LAN IP with 'ipconfig' (Windows) — NOT the 172.x WSL address.
 
 ${YW}Quick end-to-end test from the Proxmox CT:${CL}

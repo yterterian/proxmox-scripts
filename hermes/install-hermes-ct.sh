@@ -2,6 +2,10 @@
 # =============================================================================
 # File: hermes-proxmox/install-hermes-ct.sh
 #
+# LEGACY PATH: this script overlaps heavily with hermes-proxmox-deploy.sh.
+# Keep it only for its older multi-provider/manual-bootstrap flow. The
+# maintained Proxmox deploy path is hermes-proxmox-deploy.sh.
+#
 # Community-style Proxmox VE deployment for Hermes Agent (Nous Research).
 # Run this ON THE PROXMOX HOST as root. It creates an unprivileged Debian 12
 # LXC, installs Hermes under a dedicated least-privilege user, drops in a
@@ -46,6 +50,9 @@ command -v pct >/dev/null 2>&1 || { msg_err "pct not found — this must run on 
 command -v whiptail >/dev/null 2>&1 || { msg_err "whiptail not found (apt install whiptail)."; exit 1; }
 
 clear; header
+echo -e "${YW}WARNING:${CL} install-hermes-ct.sh is a legacy installer."
+echo -e "         Prefer ${GN}hermes-proxmox-deploy.sh${CL} for the maintained path."
+echo
 
 # ---- settings ---------------------------------------------------------------
 NEXTID="$(pvesh get /cluster/nextid 2>/dev/null || echo 100)"

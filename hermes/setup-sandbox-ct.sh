@@ -7,9 +7,9 @@
 #
 # Architecture:
 #   CT 100 (Hermes/Simba, holds secrets)  --ssh-->  CT 105 (sandbox, runs Docker)
-#   Hermes terminal.backend=docker + DOCKER_HOST=ssh://sandbox@10.1.1.120
-#   => every agent shell spawns an ephemeral container ON 105, never on 100.
-#   => secrets stay on 100; blast radius is a box you can `pct destroy`.
+#   Hermes terminal.backend=docker + DOCKER_HOST=ssh://sandbox@<sandbox-ip>
+#   => shell containers run ON 105, never on 100
+#   => secrets stay on 100; the sandbox CT is the disposable boundary
 #
 # Keep terminal CLI-ONLY (already removed from the Telegram toolset).
 # =============================================================================
@@ -18,9 +18,9 @@ set -euo pipefail
 # ---- settings ---------------------------------------------------------------
 SANDBOX_CTID="105"
 HERMES_CTID="100"
-SANDBOX_IP="10.1.1.120/24"
-SANDBOX_GW="10.1.1.1"
-SANDBOX_ADDR="10.1.1.120"
+SANDBOX_IP_CIDR="${SANDBOX_IP_CIDR:-}"
+SANDBOX_GW="${SANDBOX_GW:-}"
+SANDBOX_ADDR=""
 BRIDGE="vmbr0"
 STORAGE="local-lvm"
 CORES="2"; RAM="2048"; DISK="30"
@@ -41,8 +41,17 @@ command -v pct >/dev/null || die "pct not found — run on a Proxmox VE host."
 pct status "$HERMES_CTID" >/dev/null 2>&1 || die "Hermes CT $HERMES_CTID not found."
 pct status "$SANDBOX_CTID" >/dev/null 2>&1 && die "CT $SANDBOX_CTID already exists — pick a free ID or destroy it first."
 
+if [[ -n "$SANDBOX_IP_CIDR" ]]; then
+  [[ -n "$SANDBOX_GW" ]] || die "SANDBOX_GW is required when SANDBOX_IP_CIDR is set."
+  NET0="name=eth0,bridge=${BRIDGE},ip=${SANDBOX_IP_CIDR},gw=${SANDBOX_GW}"
+  NETWORK_MODE="static ${SANDBOX_IP_CIDR} via ${SANDBOX_GW}"
+else
+  NET0="name=eth0,bridge=${BRIDGE},ip=dhcp"
+  NETWORK_MODE="dhcp (recommended with a DHCP reservation)"
+fi
+
 echo -e "${YW}About to create sandbox CT $SANDBOX_CTID:${CL}
-  IP $SANDBOX_IP  GW $SANDBOX_GW  bridge $BRIDGE  storage $STORAGE
+  Network $NETWORK_MODE  bridge $BRIDGE  storage $STORAGE
   ${CORES} cores / ${RAM}MB / ${DISK}GB
   Hermes CT $HERMES_CTID hermes user will SSH in as '$SANDBOX_USER'."
 read -rp "Proceed? [y/N] " a; [[ "$a" =~ ^[Yy]$ ]] || die "Aborted."
@@ -60,12 +69,18 @@ pct create "$SANDBOX_CTID" "local:vztmpl/$TEMPLATE" \
   --hostname "hermes-sandbox" \
   --cores "$CORES" --memory "$RAM" \
   --rootfs "${STORAGE}:${DISK}" \
-  --net0 "name=eth0,bridge=${BRIDGE},ip=${SANDBOX_IP},gw=${SANDBOX_GW}" \
+  --net0 "$NET0" \
   --unprivileged 1 \
   --features "nesting=1,keyctl=1" \
   --onboot 1 >/dev/null
 pct start "$SANDBOX_CTID" >/dev/null
-for _ in $(seq 1 30); do pct exec "$SANDBOX_CTID" -- ping -c1 -W1 "$SANDBOX_GW" >/dev/null 2>&1 && break; sleep 2; done
+for _ in $(seq 1 30); do
+  SANDBOX_ADDR="$(pct exec "$SANDBOX_CTID" -- bash -lc "hostname -I | awk '{print \$1}'" 2>/dev/null | tr -d '\r')"
+  [ -n "$SANDBOX_ADDR" ] || { sleep 2; continue; }
+  pct exec "$SANDBOX_CTID" -- ping -c1 -W1 1.1.1.1 >/dev/null 2>&1 && break
+  sleep 2
+done
+[ -n "$SANDBOX_ADDR" ] || die "Sandbox CT never reported an IPv4 address."
 ok "Sandbox CT up at $SANDBOX_ADDR"
 
 # ---- 2. install Docker on the sandbox ----------------------------------------
@@ -176,8 +191,11 @@ ${YW}Next:${CL}
   1. Restart the gateway:  pct exec $HERMES_CTID -- systemctl restart hermes-gateway
   2. Test from CLI:  pct enter $HERMES_CTID -> su - hermes -> hermes
      Ask it to run a shell command — it should execute on $SANDBOX_ADDR.
+  3. If you used DHCP, reserve $SANDBOX_ADDR for CT $SANDBOX_CTID in UniFi/DHCP
+     so DOCKER_HOST stays stable across reboots.
 
 ${YW}Optional hardening:${CL}
+  - Put CT 100 and CT $SANDBOX_CTID on a private bridge for a dedicated control plane.
   - Firewall CT $SANDBOX_CTID so it can't reach CT $HERMES_CTID (defence in depth).
   - Run sandbox containers with --network=none if they don't need pip/npm.
   - To nuke and rebuild:  pct stop $SANDBOX_CTID && pct destroy $SANDBOX_CTID

@@ -134,6 +134,23 @@ chmod 440 /etc/sudoers.d/hermes-install
 echo "[4/8] Installing Hermes Agent as ${SVCUSER} (uv + venv in userspace)"
 runuser -l "$SVCUSER" -c 'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash'
 
+echo "[4b/8] Installing Telegram adapter dependency"
+runuser -l "$SVCUSER" -c '
+  VENV_PY="$HOME/.hermes/hermes-agent/venv/bin/python"
+  UV="$(command -v uv || true)"
+  if [ -z "$UV" ] && [ -x "$HOME/.local/bin/uv" ]; then
+    UV="$HOME/.local/bin/uv"
+  fi
+  if [ -n "$UV" ] && [ -x "$UV" ]; then
+    "$UV" pip install --python "$VENV_PY" python-telegram-bot
+  else
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+    "$VENV_PY" /tmp/get-pip.py
+    "$VENV_PY" -m pip install python-telegram-bot
+    rm -f /tmp/get-pip.py
+  fi
+'
+
 echo "[5/8] Revoking installer sudo (agent runs unprivileged from here on)"
 rm -f /etc/sudoers.d/hermes-install
 
@@ -177,6 +194,9 @@ platform_toolsets:
 
 # --- Authority binding: only this chat is the principal ----------------------
 gateway:
+  dm_policy: allowlist
+  allowed_users:
+    - "${HOME_CHAT_ID}"
   platforms:
     telegram:
       home_chat_id: "${HOME_CHAT_ID}"
@@ -187,6 +207,13 @@ privacy:
   redact_pii: true
 YAML
 chown "${SVCUSER}:${SVCUSER}" "${HHOME}/config.yaml"; chmod 600 "${HHOME}/config.yaml"
+
+echo "[6b/8] Installing simba launcher"
+cat >/usr/local/bin/simba <<EOF
+#!/usr/bin/env bash
+exec su - ${SVCUSER} -c 'cd ~ && hermes'
+EOF
+chmod 755 /usr/local/bin/simba
 
 echo "[7/8] Freezing the skills directory read-only (root-owned 0555/0444)"
 # A non-root agent cannot write into a root-owned, non-writable tree. Combined
@@ -212,18 +239,20 @@ Type=simple
 User=${SVCUSER}
 Group=${SVCUSER}
 Environment=HOME=/home/${SVCUSER}
+Environment=PATH=/home/${SVCUSER}/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=/home/${SVCUSER}
 # Hermes writes to ~/.hermes — ProtectHome MUST be off or every write fails.
 ProtectHome=false
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
+TimeoutStopSec=210
 ReadWritePaths=/home/${SVCUSER}/.hermes
 # Belt-and-braces over the DAC freeze above:
 ReadOnlyPaths=/home/${SVCUSER}/.hermes/skills
 # 'gateway run' stays in the foreground for systemd to supervise.
 # ('gateway start' self-daemonises — wrong under systemd.)
-ExecStart=/usr/bin/bash -lc 'exec hermes gateway run'
+ExecStart=/usr/bin/env bash -lc 'exec hermes gateway run'
 Restart=on-failure
 RestartSec=5
 
@@ -232,9 +261,9 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable --now hermes-gateway.service >/dev/null 2>&1 || true
+systemctl enable --now hermes-gateway.service >/dev/null 2>&1
 sleep 3
-systemctl --no-pager --lines=15 status hermes-gateway.service || true
+systemctl --no-pager --lines=15 status hermes-gateway.service
 INSTALL
 
 pct push "$CTID" "$INSTALL_TMP" /root/hermes-install.sh --perms 700
@@ -252,6 +281,7 @@ echo
 msg_ok "Done."
 echo -e "${INFO} CTID ${CTID} (${HOSTNAME})  IP ${IP:-<dhcp pending>}"
 echo -e "${INFO} Console:    ${BL}pct enter ${CTID}${CL}"
+echo -e "${INFO} CLI helper: ${BL}pct exec ${CTID} -- simba${CL}"
 echo -e "${INFO} Logs:       ${BL}pct exec ${CTID} -- journalctl -u hermes-gateway -f${CL}"
 echo -e "${INFO} Edit skills (you only — agent can't): ${BL}pct exec ${CTID} -- chmod -R u+w /home/hermes/.hermes/skills${CL}  (then re-freeze step 7)"
 cat <<'NOTES'
@@ -259,11 +289,12 @@ cat <<'NOTES'
  Verify after first boot:
    • Message Simba from your owner chat — confirm it replies.
    • `journalctl -u hermes-gateway`: if you see a *provider/model* error, run
-     `runuser -l hermes -c 'hermes setup'` once, then re-add the hardening blocks.
+     `runuser -l hermes -c 'hermes setup'` or `runuser -l hermes -c 'hermes config'`
+     once, then re-add the hardening blocks.
    • Confirm the Tavily key/env name matches your Hermes version (web provider
      wiring varies; this script sets TAVILY_API_KEY).
    • If ProtectSystem=strict trips an unexpected write, relax it to `full`.
    • Want shell/code tools later? Add `terminal`/`code_execution` to
-     platform_toolsets AND switch the terminal backend to Docker (set CT
-     feature nesting=1) — never give the gateway a *local* shell on Telegram.
+     platform_toolsets, then run `setup-sandbox-ct.sh` so Hermes uses remote
+     Docker over SSH — never give the gateway a *local* shell on Telegram.
 NOTES
