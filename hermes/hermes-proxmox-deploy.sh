@@ -163,8 +163,8 @@ runuser -l "$SVCUSER" -c "install -d -m 700 '${HHOME}'"
 
 # --- /home/hermes/.hermes/.env (secrets, 0600) ---
 umask 077
-printf 'OPENAI_BASE_URL=%s\nOPENAI_API_KEY=ollama\nTAVILY_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\n' \
-  "$OLLAMA_BASE_URL" "$TAVILY_API_KEY" "$BOT_TOKEN" >"${HHOME}/.env"
+printf 'OPENAI_BASE_URL=%s\nOPENAI_API_KEY=ollama\nTAVILY_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
+  "$OLLAMA_BASE_URL" "$TAVILY_API_KEY" "$BOT_TOKEN" "$HOME_CHAT_ID" >"${HHOME}/.env"
 chown "${SVCUSER}:${SVCUSER}" "${HHOME}/.env"; chmod 600 "${HHOME}/.env"
 
 # --- /home/hermes/.hermes/config.yaml (hardened) ---
@@ -175,7 +175,7 @@ cat >"${HHOME}/config.yaml" <<YAML
 # blocks below as the hardening overlay. Verify with \`hermes config\`.
 model:
   default: ${OLLAMA_MODEL}
-  provider: openai-compatible
+  provider: custom
   base_url: ${OLLAMA_BASE_URL}
 
 # --- PIPS: Telegram is a read-only researcher --------------------------------
@@ -192,11 +192,11 @@ platform_toolsets:
     - session_search
     - clarify
 
-# --- Authority binding: only this chat is the principal ----------------------
+# --- Authority binding: home chat in YAML, allowlist in env ------------------
+# Current Hermes gateway auth reads platform allowlists from ~/.hermes/.env
+# (for Telegram: TELEGRAM_ALLOWED_USERS). Keep home_chat_id here for routing
+# and restart notifications, but do not rely on YAML alone for authorization.
 gateway:
-  dm_policy: allowlist
-  allowed_users:
-    - "${HOME_CHAT_ID}"
   platforms:
     telegram:
       home_chat_id: "${HOME_CHAT_ID}"

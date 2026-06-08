@@ -203,7 +203,7 @@ msg_info "Configuring provider"
 pct exec "$CTID" -- su - hermes -c "touch '$HERMES_HOME/.env' && chmod 600 '$HERMES_HOME/.env'"
 case "$PROVIDER" in
   anthropic)
-    pct exec "$CTID" -- su - hermes -c "printf 'ANTHROPIC_API_KEY=%s\n' '$ANTHROPIC_KEY' >> '$HERMES_HOME/.env'"
+    pct exec "$CTID" -- su - hermes -c "printf 'ANTHROPIC_API_KEY=%s\nTELEGRAM_ALLOWED_USERS=\n' '$ANTHROPIC_KEY' >> '$HERMES_HOME/.env'"
     pct exec "$CTID" -- su - hermes -c "hermes config set model.provider anthropic >/dev/null 2>&1 || true"
     pct exec "$CTID" -- su - hermes -c "hermes config set model.name claude-haiku-4-5 >/dev/null 2>&1 || true"
     ;;
@@ -211,7 +211,7 @@ case "$PROVIDER" in
     # GPT-5.4-mini: best cost/quality on OpenAI for an agent brain ($0.75/$4.50 per MTok,
     # ~June 2026). Clears Hermes' 64K context floor comfortably. Step up to gpt-5.4 for
     # harder reasoning turns via 'hermes model' later.
-    pct exec "$CTID" -- su - hermes -c "printf 'OPENAI_API_KEY=%s\n' '$OPENAI_KEY' >> '$HERMES_HOME/.env'"
+    pct exec "$CTID" -- su - hermes -c "printf 'OPENAI_API_KEY=%s\nTELEGRAM_ALLOWED_USERS=\n' '$OPENAI_KEY' >> '$HERMES_HOME/.env'"
     pct exec "$CTID" -- su - hermes -c "hermes config set model.provider openai >/dev/null 2>&1 || true"
     pct exec "$CTID" -- su - hermes -c "hermes config set model.name '$OPENAI_MODEL' >/dev/null 2>&1 || true"
     ;;
@@ -226,8 +226,8 @@ case "$PROVIDER" in
     #   4. Gemma 4 sampling: temperature 1.0, top_p 0.95, top_k 64
     #   Quick local smoke test (Ollama has a Hermes launcher):
     #        ollama launch hermes --model gemma4
-    pct exec "$CTID" -- su - hermes -c "printf 'OPENAI_BASE_URL=%s\nOPENAI_API_KEY=ollama\n' '$OLLAMA_BASE' >> '$HERMES_HOME/.env'"
-    pct exec "$CTID" -- su - hermes -c "hermes config set model.provider openai-compatible >/dev/null 2>&1 || true"
+    pct exec "$CTID" -- su - hermes -c "printf 'OPENAI_BASE_URL=%s\nOPENAI_API_KEY=ollama\nTELEGRAM_ALLOWED_USERS=\n' '$OLLAMA_BASE' >> '$HERMES_HOME/.env'"
+    pct exec "$CTID" -- su - hermes -c "hermes config set model.provider custom >/dev/null 2>&1 || true"
     pct exec "$CTID" -- su - hermes -c "hermes config set model.name '$OLLAMA_MODEL' >/dev/null 2>&1 || true"
     ;;
   later)
@@ -280,10 +280,11 @@ echo -e "${YW}Next steps (interactive — needs your Telegram bot token):${CL}"
 echo    "  1. pct enter $CTID"
 echo    "  2. su - hermes"
 echo    "  3. hermes gateway setup        # paste BotFather token, name it 'Simba'"
-echo    "  4. hermes config set gateway.platforms.telegram.home_chat_id <your-id>"
-echo    "  5. hermes doctor               # sanity check"
-echo    "  6. exit; systemctl enable --now hermes-gateway"
-echo    "  7. systemctl status hermes-gateway  /  journalctl -u hermes-gateway -f"
+echo    "  4. printf 'TELEGRAM_ALLOWED_USERS=<your-id>\n' >> ~/.hermes/.env"
+echo    "  5. hermes config set gateway.platforms.telegram.home_chat_id <your-id>"
+echo    "  6. hermes doctor               # sanity check"
+echo    "  7. exit; systemctl enable --now hermes-gateway"
+echo    "  8. systemctl status hermes-gateway  /  journalctl -u hermes-gateway -f"
 echo
 echo -e "${YW}Optional Layer-1 lockdown (run ON THE HOST after step 5):${CL}"
 echo    "  # Make the skills dir read-only to the agent (PIPS-style immutable"

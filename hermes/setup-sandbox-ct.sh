@@ -28,6 +28,8 @@ SANDBOX_USER="sandbox"
 SANDBOX_IMAGE="nikolaik/python-nodejs:python3.13-nodejs24"
 HERMES_USER="hermes"
 KEY_PATH="/home/hermes/.ssh/sandbox_docker"
+OUTPUT_DIR="/home/hermes/.hermes/cache/documents"
+OUTPUT_MOUNT="${OUTPUT_DIR}:/output"
 
 # ---- output helpers ---------------------------------------------------------
 GN=$'\033[1;92m'; YW=$'\033[33m'; RD=$'\033[01;31m'; CL=$'\033[m'
@@ -161,13 +163,39 @@ pct exec "$SANDBOX_CTID" -- docker pull "$SANDBOX_IMAGE" >/dev/null 2>&1 \
   && ok "Image cached" || info "Image pull failed (will pull on first use)"
 
 # ---- 7. point Hermes at the remote docker ------------------------------------
-info "Setting DOCKER_HOST for hermes (CLI surface only)"
-pct exec "$HERMES_CTID" -- su - "$HERMES_USER" -c "
-  grep -q 'DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' ~/.bashrc 2>/dev/null \
-    || echo 'export DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' >> ~/.bashrc
-  hermes config set terminal.backend docker >/dev/null 2>&1 || true
+info "Configuring Hermes to use the remote Docker sandbox"
+CONFIG_TMP="$(mktemp)"
+cat >"$CONFIG_TMP" <<'PY'
+from pathlib import Path
+import os
+
+import yaml
+
+cfg = Path.home() / ".hermes" / "config.yaml"
+data = yaml.safe_load(cfg.read_text()) or {}
+terminal = data.setdefault("terminal", {})
+terminal["backend"] = "docker"
+terminal["docker_image"] = os.environ["SANDBOX_IMAGE"]
+terminal["docker_mount_cwd_to_workspace"] = False
+terminal["docker_volumes"] = [os.environ["OUTPUT_MOUNT"]]
+terminal["container_persistent"] = True
+terminal["persistent_shell"] = True
+cfg.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+PY
+pct push "$HERMES_CTID" "$CONFIG_TMP" /root/configure-hermes-docker.py --perms 700
+rm -f "$CONFIG_TMP"
+
+pct exec "$HERMES_CTID" -- bash -lc "
+  install -d -m 700 -o $HERMES_USER -g $HERMES_USER '$OUTPUT_DIR'
+  su - $HERMES_USER -c \"
+    grep -q 'DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' ~/.bashrc 2>/dev/null \
+      || echo 'export DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR' >> ~/.bashrc
+    SANDBOX_IMAGE='$SANDBOX_IMAGE' OUTPUT_MOUNT='$OUTPUT_MOUNT' \
+      \\\$HOME/.hermes/hermes-agent/venv/bin/python /root/configure-hermes-docker.py
+  \"
+  rm -f /root/configure-hermes-docker.py
 "
-ok "DOCKER_HOST set; terminal.backend=docker"
+ok "DOCKER_HOST set; Hermes Docker backend configured with $OUTPUT_MOUNT"
 
 # ---- 8. end-to-end verify ----------------------------------------------------
 info "End-to-end test: hermes -> ssh -> docker on the sandbox"
@@ -179,20 +207,29 @@ else
      DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR docker run --rm hello-world"
 fi
 
+# ---- 9. restart gateway so warnings reflect the new terminal config ----------
+info "Restarting Hermes gateway to pick up Docker backend settings"
+pct exec "$HERMES_CTID" -- systemctl restart hermes-gateway
+sleep 3
+pct exec "$HERMES_CTID" -- systemctl --no-pager --lines=12 status hermes-gateway >/dev/null 2>&1 \
+  && ok "Gateway restarted" || info "Gateway restarted; check journal if you want detailed status"
+
 # ---- done --------------------------------------------------------------------
 cat <<MSG
 
 ${GN}Sandbox ready.${CL}
   Sandbox CT  : $SANDBOX_CTID @ $SANDBOX_ADDR  (disposable — 'pct destroy $SANDBOX_CTID' to nuke)
   Backend     : Hermes terminal.backend=docker, DOCKER_HOST=ssh://$SANDBOX_USER@$SANDBOX_ADDR
+  Output mount: $OUTPUT_MOUNT
   Surface     : CLI only (terminal stays OFF the Telegram toolset)
 
 ${YW}Next:${CL}
-  1. Restart the gateway:  pct exec $HERMES_CTID -- systemctl restart hermes-gateway
-  2. Test from CLI:  pct enter $HERMES_CTID -> su - hermes -> hermes
+  1. Test from CLI:  pct enter $HERMES_CTID -> su - hermes -> hermes
      Ask it to run a shell command — it should execute on $SANDBOX_ADDR.
-  3. If you used DHCP, reserve $SANDBOX_ADDR for CT $SANDBOX_CTID in UniFi/DHCP
+  2. If you used DHCP, reserve $SANDBOX_ADDR for CT $SANDBOX_CTID in UniFi/DHCP
      so DOCKER_HOST stays stable across reboots.
+  3. Generated files intended for Telegram/media delivery should be written under
+     /output inside the sandbox container so Hermes can map them back to $OUTPUT_DIR.
 
 ${YW}Optional hardening:${CL}
   - Put CT 100 and CT $SANDBOX_CTID on a private bridge for a dedicated control plane.
